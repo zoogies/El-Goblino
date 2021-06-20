@@ -1,16 +1,24 @@
 #imports
 import csv
+import json
 
 import discord
+from discord import message
+from discord import channel
 import requests
 from discord.ext import commands, tasks
 
 #verbose mode
-v = False
+v = True
 
 #static variables
 client = discord.Client()
-twitchAPIEndpoint = "https://api.twitch.tv/helix/search/channels?query=xqcow"
+username = 'xqcow'
+twitchAPIEndpoint = "https://api.twitch.tv/helix/streams?user_login=" + username
+twitchKeyCooldown = 24 #in hours
+checkLiveCooldown = 20 #in seconds
+isLive = False
+channelName = 'live-notifs'
 
 #declare hidden variables
 discordToken = 'loaded from tokens.csv'
@@ -42,14 +50,14 @@ try:
         print(discordToken)
         print(twitchSecret)
         print(twitchAPIheaders['Client-ID'])
-    
+
 except Exception as e:
     print('El Goblino couldnt find the tokens.csv file, make sure it exists')
     if v:
         print(e)
     exit()
 
-@tasks.loop(hours=24)
+@tasks.loop(hours=twitchKeyCooldown)
 async def getNewAuthTwitchAPI():
     try:
         newCreds = requests.post('https://id.twitch.tv/oauth2/token?client_id=' + twitchAPIheaders['Client-ID'] + '&client_secret=' + twitchSecret + '&grant_type=client_credentials')
@@ -75,6 +83,14 @@ def checkLiveStatus():
         print('El Goblino just got the live status, i wonder if my juicer is live')
 
         print(requestReturn)
+        with open('data.json', 'w') as f:
+            json.dump(requestReturn, f)
+        
+        data = requestReturn['data'][0]
+        if v:
+            print(data)
+        return data
+
         #TODO this is where i left off, take the data from this object and load it into a discord message, also add this function to the bindable flow check every like 10 seconds if he went live
         #https://python.plainenglish.io/send-an-embed-with-a-discord-bot-in-python-61d34c711046
 
@@ -84,19 +100,48 @@ def checkLiveStatus():
             print(e)
         return False
 
+def embed(streamData,channel):
+
+    title = streamData['title']
+    url = 'https://www.twitch.tv/xqcow'
+    description = 'xQcOW has gone live!'
+
+    embed=discord.Embed(title=title, url=url, description=description, color=0x20fc03)
+    if channel:
+        channel.send(embed)
+    else:
+        print('El goblino couldnt send a message to the channel because it hasnt been set')
+
+@tasks.loop(seconds=checkLiveCooldown)
+async def mainLoop(isLive,channel):
+    #get the steam data and update our state
+    streamData = checkLiveStatus()
+    if streamData:
+        #only update our variable for live if he was previously offline
+        if streamData['type'] == 'live' and isLive == False:
+            isLive = True
+            #send an embed to let me know that hes live
+            embed(streamData,channel)
+        else:
+            isLive = False
+    else:
+        print('Something went wrong when El Goblino tried to recieve the stream data :(')
+
 @client.event
 async def on_ready():
     print('{0.user} is now online.'.format(client))
     getNewAuthTwitchAPI.start()
+    mainLoop.start(isLive,channel)
+
+def setChannel(channel):
+    channel = channel
 
 @client.event
 async def on_message(message):
     if message.author == client.user:
         return
-
-    if message.content.startswith('$check'):
-        livestatus = checkLiveStatus()
-        if livestatus:
-            await message.channel.send(livestatus)
+    if message.content.startswith('GOBLIN INITIATE'):
+        setChannel(message.chanel)
+        await message.channel.send('Goblin is now craling around in "'+str(message.channel)+'"')
 
 client.run(discordToken)
