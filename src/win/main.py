@@ -34,7 +34,7 @@ twitchAPIheaders = {
 #dynamic variables loaded in via tokens.csv
 try:
     #create our reader and read our values from the csv file inside /src
-    tokenFile = open("src/tokens.csv", "r")
+    tokenFile = open("src/win/tokens.csv", "r")
     csv_reader = csv.reader(tokenFile)
     tokensList = []
     for row in csv_reader:
@@ -86,8 +86,8 @@ def checkLiveStatus():
             print(requestReturn)
         print('El Goblino just got the live status, i wonder if my juicer is live')
 
-        with open('data.json', 'w') as f:
-            json.dump(requestReturn, f)
+        #with open('data.json', 'w') as f:
+        #   json.dump(requestReturn, f)
         try:
             data = requestReturn['data'][0]
         except:

@@ -1,2 +1,3 @@
 
-src/tokens.csv
+src/win/tokens.csv
+src/linux/tokens.csv
